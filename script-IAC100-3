@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# Interrompe o script se qualquer comando falhar
+set -e
+
+# Garante que erros em pipes sejam detectados
+set -o pipefail
+
+# ==============================
+# CONFIGURAÇÕES GERAIS
+# ==============================
+
+# Número de threads (ajuste conforme seu hardware)
+THREADS=8
+
+# Prefixo para nomear todos os arquivos de saída
+PREFIX="IAC100-3"
+
+# Arquivos FASTQ brutos (paired-end)
+RAW1="Unknown_CR776-002L0001_good_1.fq.gz"
+RAW2="Unknown_CR776-002L0001_good_2.fq.gz"
+
+# Arquivos de saída após trimming
+TRIM1="${PREFIX}_1-trim.fq.gz"
+TRIM2="${PREFIX}_2-trim.fq.gz"
+
+# Caminho absoluto para o índice do HISAT2 (já construído)
+GENOME_INDEX="/home/eulalio/IAC100-3/genome-index/gmax_index"
+
+# Arquivo de anotação (GTF)
+ANNOTATION="annotation.gtf"
+
+# ==============================
+# PASSO 0 - CHECAGEM DE INTEGRIDADE
+# ==============================
+
+echo ">>> Verificando integridade dos arquivos FASTQ..."
+
+# Testa se os arquivos .gz estão íntegros (detecta corrupção)
+gzip -t $RAW1
+gzip -t $RAW2
+
+echo ">>> Arquivos íntegros ✔"
+
+# ==============================
+# PASSO 1 - CONTROLE DE QUALIDADE (FASTQC)
+# ==============================
+
+echo ">>> Rodando FastQC nos dados brutos..."
+
+# Gera relatórios de qualidade (HTML + .zip)
+fastqc $RAW1 $RAW2 -t $THREADS
+
+# ==============================
+# PASSO 2 - TRIMMING (fastp)
+# ==============================
+
+echo ">>> Executando trimming com fastp..."
+
+# Remove bases de baixa qualidade e adaptações
+fastp \
+  -i $RAW1 \                # read forward
+  -I $RAW2 \                # read reverse
+  -o $TRIM1 \               # saída forward
+  -O $TRIM2 \               # saída reverse
+  -q 20 \                   # qualidade mínima (Phred)
+  -u 30 \                   # máximo % de bases ruins permitidas
+  -l 40 \                   # tamanho mínimo da read após trimming
+  --detect_adapter_for_pe \ # detecção automática de adaptadores
+  -h ${PREFIX}_fastp.html \ # relatório HTML
+  -j ${PREFIX}_fastp.json \ # relatório JSON
+  -w $THREADS               # número de threads
+
+# ==============================
+# PASSO 3 - QUALIDADE PÓS-TRIM
+# ==============================
+
+echo ">>> Rodando FastQC nos dados trimados..."
+
+# Avalia qualidade após limpeza
+fastqc $TRIM1 $TRIM2 -t $THREADS
+
+# ==============================
+# PASSO 4 - VERIFICAÇÃO DO ÍNDICE
+# ==============================
+
+echo ">>> Verificando existência do índice HISAT2..."
+
+# Confere se o índice existe (arquivo .1.ht2 é suficiente)
+if [ ! -f "${GENOME_INDEX}.1.ht2" ]; then
+    echo "ERRO: índice não encontrado em:"
+    echo $GENOME_INDEX
+    exit 1
+fi
+
+echo ">>> Índice encontrado ✔"
+
+# ==============================
+# PASSO 5 - MAPEAMENTO (HISAT2 + SAMTOOLS)
+# ==============================
+
+echo ">>> Iniciando mapeamento das reads..."
+
+# Pipeline em stream:
+# HISAT2 -> SAMTOOLS VIEW -> SAMTOOLS SORT
+# Evita gerar arquivo SAM gigante (economiza disco e tempo)
+
+hisat2 \
+  -x $GENOME_INDEX \        # prefixo do índice
+  -1 $TRIM1 \               # read forward
+  -2 $TRIM2 \               # read reverse
+  --dta \                   # otimização para RNA-seq (importante!)
+  -p $THREADS | \           # threads
+
+samtools view -@ $THREADS -bS - | \   # converte SAM (stdin) → BAM
+
+samtools sort -@ $THREADS -o ${PREFIX}-sort.bam  # ordena BAM
+
+# Indexação do BAM (necessário para downstream)
+samtools index ${PREFIX}-sort.bam
+
+# ==============================
+# PASSO 6 - CONTAGEM DE READS
+# ==============================
+
+echo ">>> Executando contagem com featureCounts..."
+
+# Conta reads por gene
+featureCounts \
+  -a $ANNOTATION \          # arquivo GTF
+  -o counts.txt \           # arquivo de saída
+  -p \                      # paired-end
+  -T $THREADS \             # threads
+  -g gene_id \              # atributo usado como ID
+  -t exon \                 # feature considerada (exon)
+  ${PREFIX}-sort.bam        # BAM de entrada
+
+# ==============================
+# FINALIZAÇÃO
+# ==============================
+
+echo ">>> Pipeline finalizado com sucesso!"
