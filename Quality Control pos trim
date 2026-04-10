@@ -1,0 +1,6 @@
+# ==============================
+# PASSO 3 - QC TRIMADOS
+# ==============================
+
+fastqc $TRIM1 $TRIM2 -o qc_trimmed -t $THREADS
+multiqc qc_trimmed -o qc_trimmed
