@@ -1,0 +1,11 @@
+# ==============================
+# PASSO 1 - FASTQC + MULTIQC
+# ==============================
+
+mkdir -p qc_raw qc_trimmed
+
+# QC inicial
+fastqc $RAW1 $RAW2 -o qc_raw -t $THREADS
+
+# Consolidar relatório
+multiqc qc_raw -o qc_raw
