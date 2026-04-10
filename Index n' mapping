@@ -1,0 +1,28 @@
+# ==============================
+# CONSTRUIR ÍNDICE COM ANOTAÇÃO
+# ==============================
+
+hisat2_extract_splice_sites.py annotation.gtf > splice_sites.txt
+hisat2_extract_exons.py annotation.gtf > exons.txt
+
+hisat2-build \
+  --ss splice_sites.txt \
+  --exon exons.txt \
+  genome.fa \
+  gmax_index
+
+# ==============================
+# ALINHAMENTO GUIADO
+# ==============================
+
+hisat2 \
+  -x gmax_index \
+  -1 R1_trim.fq.gz \
+  -2 R2_trim.fq.gz \
+  --dta \
+  --known-splicesite-infile splice_sites.txt \
+  --summary-file sample_summary.txt \
+  -p 8 | \
+samtools view -bS - | \
+samtools sort -o sample_sorted.bam
+
