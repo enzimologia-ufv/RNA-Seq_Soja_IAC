@@ -5,24 +5,46 @@
 plotPCA(vsd, intgroup="condition")
 
 # ==============================
-# PASSO 11 - HEATMAP
+# PASSO 11 - HEATMAP GENES VARIAVEIS
 # ==============================
 
-select <- order(rowMeans(counts(dds, normalized=TRUE)),
-                decreasing=TRUE)[1:50]
+genotypes <- levels(sample_info$genotype)
 
-pheatmap(assay(vsd)[select, ],
-         cluster_rows=TRUE,
-         cluster_cols=TRUE,
-         annotation_col=sample_info)
+comparisons <- combn(genotypes, 2, simplify = FALSE)
+
+results_list <- list()
+
+for (comp in comparisons) {
+  
+  g1 <- comp[1]
+  g2 <- comp[2]
+  
+  cat("Comparando:", g1, "vs", g2, "\n")
+  
+  res <- results(dds, contrast = c("genotype", g1, g2))
+  
+  # shrink logFC
+  coef_name <- paste0("genotype_", g1, "_vs_", g2)
+  
+  resLFC <- lfcShrink(dds,
+                      contrast = c("genotype", g1, g2),
+                      type = "apeglm")
+  
+  resLFC <- resLFC[order(resLFC$padj), ]
+  
+  results_list[[paste(g1, "vs", g2, sep = "_")]] <- resLFC
+  
+  write.csv(as.data.frame(resLFC),
+            paste0("DE_", g1, "_vs_", g2, ".csv"))
+}
 
 # ==============================
 # PASSO 12 - VOLCANO
 # ==============================
 
-res_df <- as.data.frame(resLFC)
+res_df <- as.data.frame(results_list[["IAC100_vs_BR16"]])
 
-ggplot(res_df, aes(x=log2FoldChange, y=-log10(padj))) +
+ggplot(res_df, aes(log2FoldChange, -log10(padj))) +
   geom_point(alpha=0.4) +
   theme_minimal()
 
