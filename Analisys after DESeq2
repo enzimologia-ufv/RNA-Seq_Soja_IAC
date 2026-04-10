@@ -4,6 +4,8 @@
 
 plotPCA(vsd, intgroup="condition")
 
+plotPCA(vsd, intgroup="genotype")
+
 # ==============================
 # PASSO 11 - HEATMAP GENES VARIAVEIS
 # ==============================
@@ -52,10 +54,8 @@ ggplot(res_df, aes(log2FoldChange, -log10(padj))) +
 # PASSO 13 - EXPORT
 # ==============================
 
-write.csv(as.data.frame(res), "DE_results_raw.csv")
-write.csv(as.data.frame(resLFC), "DE_results_shrink.csv")
+write.csv(as.data.frame(resLFC), "DE_tratamento_vs_controle.csv")
 
-# genes significativos
-sig <- subset(res, padj < 0.05)
+sig <- subset(resLFC, padj < 0.05)
 
-write.csv(sig, "DE_genes_significant.csv")
+write.csv(sig, "DE_significant.csv")
