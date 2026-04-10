@@ -1,0 +1,18 @@
+# ==============================
+# PASSO 2 - TRIMMING (fastp)
+# ==============================
+
+fastp \
+  -i $RAW1 \
+  -I $RAW2 \
+  -o $TRIM1 \
+  -O $TRIM2 \
+  --detect_adapter_for_pe \
+  -q 20 \                  # qualidade mínima
+  -u 30 \                  # % bases não confiáveis permitidas
+  -l 40 \                  # tamanho mínimo
+  --cut_front \            # remove viés inicial
+  --cut_tail \             # remove cauda ruim
+  -h ${PREFIX}_fastp.html \
+  -j ${PREFIX}_fastp.json \
+  -w $THREADS
