@@ -30,9 +30,14 @@ sample_names <- colnames(counts)
 
 genotype <- gsub("-[0-9]+", "", sample_names)
 
+condition <- ifelse(genotype %in% c("BR16","UFV105"),
+                    "controle",
+                    "tratamento")
+
 sample_info <- data.frame(
   row.names = sample_names,
-  genotype = factor(genotype)
+  genotype = factor(genotype),
+  condition = factor(condition)
 )
 
 sample_info
@@ -44,7 +49,7 @@ sample_info
 dds <- DESeqDataSetFromMatrix(
   countData = counts,
   colData = sample_info,
-  design = ~ genotype
+  design = ~ genotype + condition
 )
 
 # ==============================
@@ -61,6 +66,10 @@ dds <- dds[keep, ]
 dds <- DESeq(dds)
 
 resultsNames(dds)
+
+res <- results(dds, contrast = c("condition","tratamento","controle"))
+
+res <- res[order(res$padj), ]
 
 # ==============================
 # PASSO 7 - RESULTADOS
