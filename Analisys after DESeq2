@@ -1,0 +1,39 @@
+# ==============================
+# PASSO 10 - PCA
+# ==============================
+
+plotPCA(vsd, intgroup="condition")
+
+# ==============================
+# PASSO 11 - HEATMAP
+# ==============================
+
+select <- order(rowMeans(counts(dds, normalized=TRUE)),
+                decreasing=TRUE)[1:50]
+
+pheatmap(assay(vsd)[select, ],
+         cluster_rows=TRUE,
+         cluster_cols=TRUE,
+         annotation_col=sample_info)
+
+# ==============================
+# PASSO 12 - VOLCANO
+# ==============================
+
+res_df <- as.data.frame(resLFC)
+
+ggplot(res_df, aes(x=log2FoldChange, y=-log10(padj))) +
+  geom_point(alpha=0.4) +
+  theme_minimal()
+
+# ==============================
+# PASSO 13 - EXPORT
+# ==============================
+
+write.csv(as.data.frame(res), "DE_results_raw.csv")
+write.csv(as.data.frame(resLFC), "DE_results_shrink.csv")
+
+# genes significativos
+sig <- subset(res, padj < 0.05)
+
+write.csv(sig, "DE_genes_significant.csv")
