@@ -1,0 +1,14 @@
+# ==============================
+# CONTAGEM POR GENE
+# ==============================
+
+featureCounts \
+  -a annotation.gtf \
+  -o counts.txt \
+  -p \
+  -B \
+  -C \
+  -T 8 \
+  -g gene_id \
+  -t exon \
+  sample_sorted.bam
